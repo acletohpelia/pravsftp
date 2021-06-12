@@ -2,6 +2,8 @@
 
 import socket
 import threading
+import os
+import time
 import sys
 
 buff_size = 128
@@ -23,10 +25,10 @@ class EchoThread(threading.Thread):
             cmd, filename = req_line.split()
         else:
             cmd = "void"
-
-        if cmd == "get":
+        cmd = cmd.upper()
+        if cmd == "GET":
             try:
-                fd = open(filename, 'r')
+                fd = open("./pwd/" + filename, 'r')
                 code = '100'
             except:
                 code = '400'
@@ -46,9 +48,54 @@ class EchoThread(threading.Thread):
                 pass
 
         elif cmd == "PUT":
-            pass
+            # read the split line between response line and message body
+            stime = time.time()
+            sd.readline()
+            # server sent the requested file, create a file and save it
+            fd = open("./pwd/" + filename, 'w')
+            for req in sd:
+                if str(req) == "EOF\n":
+                    print(req)
+                    break
+                fd.write(req)
 
+            fd.close()
+            fd = open("./pwd/" + filename, 'r')
+            fdd = fd.read()
+            fd.close()
+            if os.path.isfile("./pwd/d" + filename):
+                os.remove("./pwd/d" + filename)
+            fdd = fdd[:-1]
+            wfd = open("./pwd/" + filename, 'w')
+            wfd.write(fdd)
+            wfd.close()
+            sd.close()
+            resmessage = "100 FileSaved \n\nFile Received Successfully\n"
+            resmessage = resmessage + "FileSize : " + str(round((os.path.getsize("./pwd/" + filename) / 1024), 2)) + "KB"
+            resmessage = resmessage + "\nExecutionTime : " + str(round((time.time() - stime), 4))
+            self.csocket.sendall(resmessage.encode())
+
+            pass
+        elif cmd == "LS":
+            dirlist = os.listdir("./pwd/")
+            resp_line = '300 FileListFetched' + '\n\n'
+            self.csocket.sendall(resp_line.encode())
+            body = '\n'.join(dirlist)
+            body = "pwd\n" + body
+            self.csocket.sendall(body.encode())
+            pass
+        elif cmd == "DEL":
+            try:
+                os.remove("./pwd/" + filename)
+                resp_line = '301 FileisDeleted' + '\n\n'
+            except:
+                resp_line = '400 Not_Found' + '\n\n'
+
+
+            self.csocket.sendall(resp_line.encode())
+            pass
         else:
+            print("not worked")
             pass
 
         self.csocket.close()
